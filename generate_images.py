@@ -112,10 +112,22 @@ async def main() -> None:
     exclude_langs = ({x.strip() for x in exclude_langs.split(",")}
                      if exclude_langs else None)
     consider_forked_repos = len(os.getenv("COUNT_STATS_FROM_FORKS")) != 0
+    lang_weights_str = os.getenv("LANG_WEIGHTS")
+    lang_weights = None
+    if lang_weights_str:
+        lang_weights = {}
+        for item in lang_weights_str.split(","):
+            if ":" in item:
+                k, v = item.split(":", 1)
+                try:
+                    lang_weights[k.strip()] = float(v.strip())
+                except ValueError:
+                    continue
     async with aiohttp.ClientSession() as session:
         s = Stats(user, access_token, session, exclude_repos=exclude_repos,
                   exclude_langs=exclude_langs,
-                  consider_forked_repos=consider_forked_repos)
+                  consider_forked_repos=consider_forked_repos,
+                  lang_weights=lang_weights)
         await asyncio.gather(generate_languages(s), generate_overview(s))
 
 

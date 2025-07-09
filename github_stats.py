@@ -233,11 +233,14 @@ class Stats(object):
                  session: aiohttp.ClientSession,
                  exclude_repos: Optional[Set] = None,
                  exclude_langs: Optional[Set] = None,
-                 consider_forked_repos: bool = False):
+                 consider_forked_repos: bool = False,
+                 lang_weights: Optional[Dict[str, float]] = None):  # 👈 새로 추가
+
         self.username = username
         self._exclude_repos = set() if exclude_repos is None else exclude_repos
         self._exclude_langs = set() if exclude_langs is None else exclude_langs
         self._consider_forked_repos = consider_forked_repos
+        self._lang_weights = lang_weights or {}
         self.queries = Queries(username, access_token, session)
 
         self._name = None
@@ -353,9 +356,11 @@ Languages:
 
         # TODO: Improve languages to scale by number of contributions to
         #       specific filetypes
-        langs_total = sum([v.get("size", 0) for v in self._languages.values()])
+        # 수정된 코드
+        langs_total = sum([v.get("size", 0) * self._lang_weights.get(k, 1.0) for k, v in self._languages.items()])
         for k, v in self._languages.items():
-            v["prop"] = 100 * (v.get("size", 0) / langs_total)
+            weighted_size = v.get("size", 0) * self._lang_weights.get(k, 1.0)
+            v["prop"] = 100 * (weighted_size / langs_total)
 
     @property
     async def name(self) -> str:
