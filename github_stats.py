@@ -362,6 +362,21 @@ Languages:
             weighted_size = v.get("size", 0) * self._lang_weights.get(k, 1.0)
             v["prop"] = 100 * (weighted_size / langs_total)
 
+        # 상위 6개 언어만 남기고, 이 6개 언어의 합을 100%로 하여 비율을 재계산
+        weighted_langs = [
+            (k, v, v.get("size", 0) * self._lang_weights.get(k, 1.0))
+            for k, v in self._languages.items()
+        ]
+        weighted_langs.sort(key=lambda x: x[2], reverse=True)
+        top_n = 6
+        top_langs = weighted_langs[:top_n]
+        langs_total = sum([item[2] for item in top_langs])
+        new_languages = {}
+        for k, v, wsize in top_langs:
+            v["prop"] = 100 * (wsize / langs_total) if langs_total > 0 else 0
+            new_languages[k] = v
+        self._languages = new_languages
+
     @property
     async def name(self) -> str:
         """
