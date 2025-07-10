@@ -57,35 +57,39 @@ async def generate_languages(s: Stats) -> None:
         output = f.read()
 
     progress = ""
-    lang_list = ""
+    lang_items = []
     sorted_languages = sorted((await s.languages).items(), reverse=True,
                               key=lambda t: t[1].get("size"))
     delay_between = 150
-    for i, (lang, data) in enumerate(sorted_languages):
+    # 최대 6개만 표시
+    for i, (lang, data) in enumerate(sorted_languages[:6]):
         color = data.get("color")
         color = color if color is not None else "#000000"
         ratio = [.98, .02]
         if data.get("prop", 0) > 50:
             ratio = [.99, .01]
-        if i == len(sorted_languages) - 1:
+        if i == min(len(sorted_languages), 6) - 1:
             ratio = [1, 0]
         progress += (f'<span style="background-color: {color};'
                      f'width: {(ratio[0] * data.get("prop", 0)):0.3f}%;'
-                     f'margin-right: {(ratio[1] * data.get("prop", 0)):0.3f}%;" '
-                     f'class="progress-item"></span>')
-        lang_list += f"""
-<li style="animation-delay: {i * delay_between}ms;">
+                     f'margin-right: {(ratio[1] * data.get("prop", 0)):0.3f}%;' 
+                     f'" class="progress-item"></span>')
+        lang_items.append(f'''<li style="animation-delay: {i * delay_between}ms;">
 <svg xmlns="http://www.w3.org/2000/svg" class="octicon" style="fill:{color};"
 viewBox="0 0 16 16" version="1.1" width="16" height="16"><path
 fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8z"></path></svg>
 <span class="lang">{lang}</span>
 <span class="percent">{data.get("prop", 0):0.2f}%</span>
-</li>
+</li>''')
 
-"""
+    # 2개씩 <div class="row">로 묶기
+    lang_rows = ""
+    for i in range(0, len(lang_items), 2):
+        row_items = "\n".join(lang_items[i:i+2])
+        lang_rows += f'<div class="row">\n{row_items}\n</div>\n'
 
     output = re.sub(r"{{ progress }}", progress, output)
-    output = re.sub(r"{{ lang_list }}", lang_list, output)
+    output = re.sub(r"{{ lang_rows }}", lang_rows, output)
 
     generate_output_folder()
     with open("generated/languages.svg", "w") as f:
@@ -112,10 +116,22 @@ async def main() -> None:
     exclude_langs = ({x.strip() for x in exclude_langs.split(",")}
                      if exclude_langs else None)
     consider_forked_repos = len(os.getenv("COUNT_STATS_FROM_FORKS")) != 0
+    lang_weights_str = os.getenv("LANG_WEIGHTS")
+    lang_weights = None
+    if lang_weights_str:
+        lang_weights = {}
+        for item in lang_weights_str.split(","):
+            if ":" in item:
+                k, v = item.split(":", 1)
+                try:
+                    lang_weights[k.strip()] = float(v.strip())
+                except ValueError:
+                    continue
     async with aiohttp.ClientSession() as session:
         s = Stats(user, access_token, session, exclude_repos=exclude_repos,
                   exclude_langs=exclude_langs,
-                  consider_forked_repos=consider_forked_repos)
+                  consider_forked_repos=consider_forked_repos,
+                  lang_weights=lang_weights)
         await asyncio.gather(generate_languages(s), generate_overview(s))
 
 
